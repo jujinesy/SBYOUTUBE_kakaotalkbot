@@ -1,0 +1,153 @@
+const learnObjPath="sdcard/anyReply/learn.txt";
+const splitKorean=Bridge.getScopeOf("response.js").n.splitKorean;
+const pro=0;
+const blackList=[];
+on=true;
+
+const readFile=(path)=>{
+var b=new java.io.File(path);
+if(!(b.exists())) return null;
+var c=new java.io.FileInputStream(b); 
+var d=new java.io.InputStreamReader(c);
+var e=new java.io.BufferedReader(d);
+var f=e.readLine();
+var g="";
+while((g=e.readLine())!=null){
+f+="\n"+g;
+}
+c.close();
+d.close();
+e.close();
+return f==null?null:String(f);
+}
+
+const saveFile=(path,file)=>{
+FileStream.write(path,file);
+}
+
+const learn=(msg)=>{
+if (msg.length>200) return;
+if (learnObj.indexOf(msg)!=-1) return;
+for (i in blackList) if (msg.indexOf(blackList[i])!=-1) return;
+learnObj.push(msg);
+}
+
+const getLearnObj=(room)=>{
+var data=readFile(learnObjPath);
+try {
+if (data==null||data=="[]") {
+Api.replyRoom("이름을입력해주세요",data);
+Log.d(Date());
+var data=readFile(learnObjPath);
+}
+return data==null?[]:eval(data);
+}catch(e) {
+saveFile("sdcard/anyReply/error/"+new Date()+".txt",data);
+return [];
+}finally {
+rand(1)?saveFile("sdcard/anyReply/bak/"+Date()+".txt",data):0;
+}
+}
+
+const rand=(num)=>{
+return Math.floor(Math.random()*100)<num;
+}
+
+const hash=(t)=>{
+return java.lang.String(t).hashCode();
+}
+
+const learnReply=(msg)=>{
+var obj=learnObj[msg];
+return obj[Math.floor(Math.random()*obj.length)];
+}
+
+const KMP=(msg,msg1)=>{
+if (!on) return;
+if (msg==msg1) return 100;
+var f=splitKorean(msg);
+var s=splitKorean(msg1);
+var t=String(msg).split("");
+var fo=String(msg1).split("");
+var c=0;
+f.map((_,i)=>{
+if (s.indexOf(f[i])!=-1) c++;
+});
+s.map((_,i)=>{
+if (f.indexOf(s[i])!=-1) c++;
+});
+t.map((_,i)=>{
+if (fo.indexOf(t[i])!=-1) c++;
+})
+fo.map((_,i)=>{
+if (t.indexOf(fo[i])!=-1) c++;
+})
+var c=(100/(f.length+s.length+t.length+fo.length))*c;
+if (c>100) c=100;
+if (c==100&&f.length!=s.length) return c-(f.length*s.length)+(msg.length+msg1.length);
+if (c==100&&f.join("")==s.join("")) return c-f.length*2.4;
+return c;
+}
+
+const reply=(msg)=>{
+var box=[];
+if (pro>3) return box;
+pro++;
+learnObj.map((_,i)=>{
+var kmp=KMP(msg,learnObj[i])
+if (kmp>85&&kmp<100) {
+Log.i(msg+"\n"+learnObj[i]+"\n"+kmp);
+box.push(learnObj[i]);
+}
+});
+pro--;
+return box;
+}
+
+const checkObj=()=>{
+var Obj=learnObj;
+var check_=0;
+learnObj.map((_,s)=>{
+var check=0
+blackList.map((__,i)=>{
+if (Obj[s].indexOf(blackList[i])!=-1) {
+check++;
+}
+});
+if (check==0) return;
+var box=[];
+for (i in learnObj) {
+if (i!=s-check_) box.push(learnObj[i]);
+}
+check_++;
+learnObj=box;
+});
+}
+
+const response=(infos)=>{
+if (!on) return;
+learnObj=getLearnObj(infos.room);
+var msg=infos.msg.trim();
+var sender=infos.sender;
+var room=infos.room;
+var replier=infos.replier;
+var profile=hash(infos.ImageDB.getProfileImage());
+if (rand(50)) {
+var l=reply(msg);
+if (l=="") {}else {
+if (typeof l=="object") {
+replier.reply(l[Math.floor(Math.random()*l.length)]);
+}else {
+replier.reply(l);
+}
+}
+}
+if (rand(8)) learn(msg);
+msg=="/상태p"?replier.reply("제한 : 3개\n처리중 : "+pro+"개"):0;
+msg=="/learnList"?replier.reply(Array(500).join("\0")+learnObj.join("\n")):0;
+msg=="/checkObj"?replier.reply(checkObj()):0;
+msg=="/쉿"?on=false:0;
+msg=="/말해"?on=true:0;
+msg=="/lDB"?replier.reply(learnObj.length+"개"):0;
+saveFile(learnObjPath,learnObj.toSource());
+}
